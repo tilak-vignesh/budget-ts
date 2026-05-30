@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
-  View, Text, FlatList, TextInput, Pressable,
-  StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform,
+  View, Text, TextInput, Pressable, StyleSheet,
+  ScrollView, KeyboardAvoidingView, Platform, Alert,
 } from 'react-native';
 import { useLocalSearchParams, useNavigation, useFocusEffect } from 'expo-router';
 import {
@@ -9,13 +9,15 @@ import {
   deleteExpense, getBudget, getSpentForCategory, getDailySpend, type Expense,
 } from '../../db/queries';
 import { currentMonth, randomInsult } from '../../constants/insults';
+import { C, FONT } from '../../constants/theme';
 import InsultModal from '../../components/InsultModal';
 import DailyChart from '../../components/DailyChart';
+import DatePicker from '../../components/DatePicker';
 
 type ExpenseWithCat = Expense & { category_name: string };
-type EditState = { id: number; amount: string; note: string } | null;
-
+type EditState = { id: number; amount: string; note: string; expense_date: string } | null;
 const sanitize = (v: string) => v.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
+const todayStr = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
 
 export default function CategoryDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -23,16 +25,16 @@ export default function CategoryDetail() {
   const navigation = useNavigation();
   const month = currentMonth();
 
-  const [catName, setCatName] = useState('');
   const [spent, setSpent] = useState(0);
   const [limit, setLimit] = useState(0);
   const [expenses, setExpenses] = useState<ExpenseWithCat[]>([]);
+  const [dailyData, setDailyData] = useState<{ day: number; total: number }[]>([]);
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
+  const [expenseDate, setExpenseDate] = useState(todayStr());
   const [editing, setEditing] = useState<EditState>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [insult, setInsult] = useState<string | null>(null);
-  const [dailyData, setDailyData] = useState<{ day: number; total: number }[]>([]);
 
   const load = useCallback(async () => {
     const [summary, allExpenses, budget, daily] = await Promise.all([
@@ -41,36 +43,38 @@ export default function CategoryDetail() {
       getBudget(catId, month),
       getDailySpend(catId, month),
     ]);
-    setDailyData(daily);
     const cat = summary.find(s => s.id === catId);
     if (cat) {
-      setCatName(cat.name);
       setSpent(cat.spent);
-      navigation.setOptions({ title: cat.name.charAt(0).toUpperCase() + cat.name.slice(1) });
+      navigation.setOptions({ title: cat.name });
     }
     setLimit(budget?.limit_amount ?? 0);
     setExpenses(allExpenses.filter(e => e.category_id === catId));
+    setDailyData(daily);
   }, [catId, month]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const submitAdd = async () => {
     const num = parseFloat(amount);
-    if (!(num > 0)) return Alert.alert('Enter a valid amount');
-    await addExpense(catId, month, num, note);
-    const newSpent = await getSpentForCategory(catId, month);
+    if (!(num > 0)) return Alert.alert('enter a valid amount');
+    await addExpense(catId, num, note, expenseDate);
+    const expMonth = expenseDate.slice(0, 7);
+    const newSpent = await getSpentForCategory(catId, expMonth);
+    const budget = await getBudget(catId, expMonth);
     setAmount('');
     setNote('');
+    setExpenseDate(todayStr());
     await load();
-    if (limit > 0 && newSpent > limit) setInsult(randomInsult());
-    else if (limit > 0 && newSpent >= limit) Alert.alert('Limit reached', "You've hit your limit for this category.");
+    if (budget && newSpent > budget.limit_amount) setInsult(randomInsult());
+    else if (budget && newSpent >= budget.limit_amount) Alert.alert('limit reached', "you've hit your limit.");
   };
 
   const submitEdit = async () => {
     if (!editing) return;
     const num = parseFloat(editing.amount);
-    if (!(num > 0)) return Alert.alert('Enter a valid amount');
-    await updateExpense(editing.id, num, editing.note);
+    if (!(num > 0)) return Alert.alert('enter a valid amount');
+    await updateExpense(editing.id, num, editing.note, editing.expense_date);
     setEditing(null);
     load();
   };
@@ -82,88 +86,78 @@ export default function CategoryDetail() {
   };
 
   const ratio = limit > 0 ? spent / limit : 0;
-  const barColor = ratio >= 1 ? '#ef4444' : ratio >= 0.8 ? '#f59e0b' : '#22c55e';
+  const barColor = ratio >= 1 ? C.danger : ratio >= 0.8 ? C.amber : C.accent;
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
 
-        {/* Summary bar */}
-        <View style={styles.summaryCard}>
+        {/* Summary */}
+        <View style={styles.card}>
           {limit > 0 ? (
             <>
               <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Spent</Text>
-                <Text style={styles.summaryLabel}>Limit</Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={[styles.summaryAmount, { color: barColor }]}>₹{spent.toFixed(0)}</Text>
-                <Text style={styles.summaryAmount}>₹{limit.toFixed(0)}</Text>
+                <View>
+                  <Text style={styles.label}>spent</Text>
+                  <Text style={[styles.bigNum, { color: barColor }]}>₹{spent.toFixed(0)}</Text>
+                </View>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={styles.label}>limit</Text>
+                  <Text style={styles.bigNum}>₹{limit.toFixed(0)}</Text>
+                </View>
               </View>
               <View style={styles.barBg}>
                 <View style={[styles.barFill, { width: `${Math.min(ratio * 100, 100)}%` as any, backgroundColor: barColor }]} />
               </View>
-              {spent > limit && (
-                <Text style={styles.overText}>Over by ₹{(spent - limit).toFixed(0)}</Text>
-              )}
+              <Text style={[styles.label, { color: ratio >= 1 ? C.danger : C.textMuted }]}>
+                {ratio >= 1
+                  ? `over by ₹${(spent - limit).toFixed(0)}`
+                  : `₹${(limit - spent).toFixed(0)} remaining`}
+              </Text>
             </>
           ) : (
-            <Text style={styles.noLimit}>No budget set for this month</Text>
+            <Text style={styles.label}>no budget set for this month</Text>
           )}
         </View>
 
-        {/* Daily chart */}
+        {/* Chart */}
         <DailyChart data={dailyData} month={month} />
 
         {/* Add expense */}
-        <View style={styles.addBox}>
-          <Text style={styles.sectionLabel}>Add Expense</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Amount (₹)"
-            keyboardType="decimal-pad"
-            value={amount}
-            onChangeText={v => setAmount(sanitize(v))}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Note (optional)"
-            value={note}
-            onChangeText={setNote}
-          />
+        <View style={styles.card}>
+          <Text style={styles.sectionLabel}>// add_expense</Text>
+          <TextInput style={styles.input} placeholder="amount (₹)" placeholderTextColor={C.textMuted}
+            keyboardType="decimal-pad" value={amount} onChangeText={v => setAmount(sanitize(v))} />
+          <TextInput style={styles.input} placeholder="note (optional)" placeholderTextColor={C.textMuted}
+            value={note} onChangeText={setNote} />
+          <DatePicker value={expenseDate} onChange={setExpenseDate} />
           <Pressable style={styles.addBtn} onPress={submitAdd}>
-            <Text style={styles.addBtnText}>Add</Text>
+            <Text style={styles.addBtnText}>$ add</Text>
           </Pressable>
         </View>
 
-        {/* Expense list */}
-        <Text style={styles.sectionLabel}>Transactions this month</Text>
-        {expenses.length === 0 && (
-          <Text style={styles.hint}>No expenses yet.</Text>
-        )}
+        {/* Transactions */}
+        <Text style={styles.sectionLabel}>// transactions</Text>
+        {expenses.length === 0 && <Text style={styles.hint}>no expenses yet</Text>}
+
         {expenses.map(item => {
           if (editing?.id === item.id) {
             return (
-              <View key={item.id} style={[styles.expenseRow, styles.editBox]}>
-                <TextInput
-                  style={styles.input}
-                  value={editing.amount}
-                  onChangeText={v => setEditing(e => e && { ...e, amount: sanitize(v) })}
-                  keyboardType="decimal-pad"
-                  placeholder="Amount (₹)"
-                />
-                <TextInput
-                  style={styles.input}
-                  value={editing.note}
-                  onChangeText={v => setEditing(e => e && { ...e, note: v })}
-                  placeholder="Note"
-                />
-                <View style={styles.rowActions}>
-                  <Pressable style={styles.saveBtn} onPress={submitEdit}>
-                    <Text style={styles.saveBtnText}>Save</Text>
+              <View key={item.id} style={[styles.expRow, styles.editRow]}>
+                <Text style={styles.sectionLabel}>// editing</Text>
+                <TextInput style={styles.input} value={editing.amount} keyboardType="decimal-pad"
+                  placeholder="amount (₹)" placeholderTextColor={C.textMuted}
+                  onChangeText={v => setEditing(e => e && { ...e, amount: sanitize(v) })} />
+                <TextInput style={styles.input} value={editing.note} placeholder="note"
+                  placeholderTextColor={C.textMuted}
+                  onChangeText={v => setEditing(e => e && { ...e, note: v })} />
+                <DatePicker value={editing.expense_date} onChange={v => setEditing(e => e && { ...e, expense_date: v })} />
+                <View style={styles.actions}>
+                  <Pressable style={styles.accentBtn} onPress={submitEdit}>
+                    <Text style={styles.accentBtnText}>$ save</Text>
                   </Pressable>
-                  <Pressable style={styles.cancelBtn} onPress={() => setEditing(null)}>
-                    <Text style={styles.cancelBtnText}>Cancel</Text>
+                  <Pressable style={styles.ghostBtn} onPress={() => setEditing(null)}>
+                    <Text style={styles.ghostBtnText}>cancel</Text>
                   </Pressable>
                 </View>
               </View>
@@ -172,14 +166,14 @@ export default function CategoryDetail() {
 
           if (confirmDeleteId === item.id) {
             return (
-              <View key={item.id} style={[styles.expenseRow, styles.confirmRow]}>
-                <Text style={styles.confirmText}>Delete this expense?</Text>
-                <View style={styles.rowActions}>
-                  <Pressable style={styles.deleteConfirmBtn} onPress={() => confirmDelete(item.id)}>
-                    <Text style={styles.deleteConfirmText}>Yes</Text>
+              <View key={item.id} style={[styles.expRow, styles.dangerRow]}>
+                <Text style={styles.confirmText}>delete this expense?</Text>
+                <View style={styles.actions}>
+                  <Pressable style={styles.dangerBtn} onPress={() => confirmDelete(item.id)}>
+                    <Text style={styles.dangerBtnText}>yes</Text>
                   </Pressable>
-                  <Pressable style={styles.cancelBtn} onPress={() => setConfirmDeleteId(null)}>
-                    <Text style={styles.cancelBtnText}>No</Text>
+                  <Pressable style={styles.ghostBtn} onPress={() => setConfirmDeleteId(null)}>
+                    <Text style={styles.ghostBtnText}>no</Text>
                   </Pressable>
                 </View>
               </View>
@@ -187,25 +181,26 @@ export default function CategoryDetail() {
           }
 
           return (
-            <View key={item.id} style={styles.expenseRow}>
+            <View key={item.id} style={styles.expRow}>
               <View style={{ flex: 1 }}>
-                <View style={styles.expenseTop}>
-                  <Text style={styles.expenseAmount}>₹{item.amount.toFixed(0)}</Text>
-                  <Text style={styles.expenseDate}>{new Date(item.created_at).toLocaleDateString()}</Text>
+                <View style={styles.expTop}>
+                  <Text style={styles.expAmount}>₹{item.amount.toFixed(0)}</Text>
+                  <Text style={styles.expDate}>{item.expense_date ?? new Date(item.created_at).toLocaleDateString()}</Text>
                 </View>
-                {item.note ? <Text style={styles.expenseNote}>{item.note}</Text> : null}
+                {item.note ? <Text style={styles.expNote}>{item.note}</Text> : null}
               </View>
-              <View style={styles.rowActions}>
-                <Pressable onPress={() => setEditing({ id: item.id, amount: String(item.amount), note: item.note ?? '' })}>
-                  <Text style={styles.editText}>Edit</Text>
+              <View style={styles.rowBtns}>
+                <Pressable onPress={() => setEditing({ id: item.id, amount: String(item.amount), note: item.note ?? '', expense_date: item.expense_date ?? todayStr() })}>
+                  <Text style={styles.editText}>edit</Text>
                 </Pressable>
                 <Pressable onPress={() => setConfirmDeleteId(item.id)}>
-                  <Text style={styles.deleteText}>Delete</Text>
+                  <Text style={styles.deleteText}>del</Text>
                 </Pressable>
               </View>
             </View>
           );
         })}
+
         <View style={{ height: 40 }} />
       </ScrollView>
 
@@ -215,49 +210,43 @@ export default function CategoryDetail() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', padding: 16 },
-  summaryCard: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 16,
-    shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 2,
+  container: { flex: 1, backgroundColor: C.bg, padding: 16 },
+  card: {
+    backgroundColor: C.surface, borderRadius: 8, padding: 16,
+    marginBottom: 16, borderWidth: 1, borderColor: C.border, gap: 10,
   },
   summaryRow: { flexDirection: 'row', justifyContent: 'space-between' },
-  summaryLabel: { fontSize: 12, color: '#94a3b8', fontWeight: '600' },
-  summaryAmount: { fontSize: 22, fontWeight: '700', color: '#1e293b', marginTop: 2 },
-  barBg: { height: 6, backgroundColor: '#f1f5f9', borderRadius: 4, marginVertical: 10, overflow: 'hidden' },
-  barFill: { height: '100%', borderRadius: 4 },
-  overText: { fontSize: 13, color: '#ef4444', fontWeight: '600' },
-  noLimit: { fontSize: 13, color: '#94a3b8' },
-  addBox: {
-    backgroundColor: '#fff', borderRadius: 12, padding: 14,
-    marginBottom: 20, gap: 10,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
-  },
-  sectionLabel: { fontSize: 13, fontWeight: '700', color: '#94a3b8', marginBottom: 8 },
+  label: { fontFamily: FONT.mono, fontSize: 10, color: C.textMuted },
+  bigNum: { fontFamily: FONT.mono, fontSize: 26, fontWeight: '700', color: C.text, marginTop: 2 },
+  barBg: { height: 2, backgroundColor: C.surface2, borderRadius: 2, overflow: 'hidden' },
+  barFill: { height: '100%', borderRadius: 2 },
+  sectionLabel: { fontFamily: FONT.mono, fontSize: 10, color: C.textMuted, marginBottom: 8 },
   input: {
-    backgroundColor: '#f8fafc', borderWidth: 1, borderColor: '#e2e8f0',
-    borderRadius: 10, padding: 12, fontSize: 15,
+    backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border,
+    borderRadius: 6, padding: 12, fontFamily: FONT.mono, fontSize: 14, color: C.text,
   },
-  addBtn: { backgroundColor: '#6366f1', borderRadius: 10, padding: 13, alignItems: 'center' },
-  addBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  expenseRow: {
-    backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+  addBtn: { borderWidth: 1, borderColor: C.accent, borderRadius: 6, padding: 12, alignItems: 'center' },
+  addBtnText: { fontFamily: FONT.mono, color: C.accent, fontSize: 13 },
+  expRow: {
+    backgroundColor: C.surface, borderRadius: 8, padding: 14,
+    marginBottom: 8, borderWidth: 1, borderColor: C.border,
   },
-  editBox: { borderWidth: 1, borderColor: '#6366f1', gap: 8 },
-  confirmRow: { backgroundColor: '#fef2f2' },
-  expenseTop: { flexDirection: 'row', justifyContent: 'space-between' },
-  expenseAmount: { fontSize: 16, fontWeight: '700', color: '#1e293b' },
-  expenseDate: { fontSize: 12, color: '#94a3b8' },
-  expenseNote: { fontSize: 13, color: '#64748b', marginTop: 2 },
-  rowActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  editText: { color: '#6366f1', fontSize: 13, fontWeight: '600' },
-  deleteText: { color: '#ef4444', fontSize: 13, fontWeight: '600' },
-  confirmText: { fontSize: 14, color: '#334155', marginBottom: 8 },
-  saveBtn: { flex: 1, backgroundColor: '#6366f1', borderRadius: 8, padding: 10, alignItems: 'center' },
-  saveBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  cancelBtn: { flex: 1, backgroundColor: '#f1f5f9', borderRadius: 8, padding: 10, alignItems: 'center' },
-  cancelBtnText: { color: '#475569', fontWeight: '600', fontSize: 14 },
-  deleteConfirmBtn: { flex: 1, backgroundColor: '#ef4444', borderRadius: 8, padding: 10, alignItems: 'center' },
-  deleteConfirmText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  hint: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginTop: 20 },
+  editRow: { borderColor: C.accent, gap: 8 },
+  dangerRow: { borderColor: C.danger },
+  expTop: { flexDirection: 'row', justifyContent: 'space-between' },
+  expAmount: { fontFamily: FONT.mono, fontSize: 15, fontWeight: '700', color: C.text },
+  expDate: { fontFamily: FONT.mono, fontSize: 11, color: C.textMuted },
+  expNote: { fontFamily: FONT.mono, fontSize: 12, color: C.textMuted, marginTop: 3 },
+  rowBtns: { flexDirection: 'row', gap: 14, marginTop: 8 },
+  editText: { fontFamily: FONT.mono, fontSize: 12, color: C.accent },
+  deleteText: { fontFamily: FONT.mono, fontSize: 12, color: C.danger },
+  confirmText: { fontFamily: FONT.mono, fontSize: 13, color: C.text, marginBottom: 10 },
+  actions: { flexDirection: 'row', gap: 8 },
+  accentBtn: { flex: 1, borderWidth: 1, borderColor: C.accent, borderRadius: 6, padding: 10, alignItems: 'center' },
+  accentBtnText: { fontFamily: FONT.mono, color: C.accent, fontSize: 13 },
+  ghostBtn: { flex: 1, borderWidth: 1, borderColor: C.border2, borderRadius: 6, padding: 10, alignItems: 'center' },
+  ghostBtnText: { fontFamily: FONT.mono, color: C.textMuted, fontSize: 13 },
+  dangerBtn: { flex: 1, borderWidth: 1, borderColor: C.danger, borderRadius: 6, padding: 10, alignItems: 'center' },
+  dangerBtnText: { fontFamily: FONT.mono, color: C.danger, fontSize: 13 },
+  hint: { fontFamily: FONT.mono, fontSize: 13, color: C.textMuted, textAlign: 'center', marginTop: 20 },
 });

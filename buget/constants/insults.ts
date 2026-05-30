@@ -9,6 +9,7 @@ export const INSULTS = [
   "Your ancestors saved up for land. You can't save for groceries.",
   "Bro… really?",
   "This is why we can't have nice things.",
+  "You deserve this. Be proud of your brokeness you bitch."
 ];
 
 export function randomInsult(): string {

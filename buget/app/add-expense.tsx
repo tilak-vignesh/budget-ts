@@ -34,7 +34,9 @@ export default function AddExpenseScreen() {
       return Alert.alert('No budget set', 'Set a limit for this category first (Limits tab).');
     }
 
-    await addExpense(selectedId, month, num, note);
+    const today = new Date();
+    const expenseDate = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    await addExpense(selectedId, num, note, expenseDate);
     const spent = await getSpentForCategory(selectedId, month);
 
     setSaving(false);

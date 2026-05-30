@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import type { CategorySummary } from '../db/queries';
+import { C, FONT } from '../constants/theme';
 
 type Props = { item: CategorySummary; onPress: () => void };
 
@@ -8,16 +9,15 @@ export default function CategoryCard({ item, onPress }: Props) {
   const hasLimit = item.limit_amount !== null && item.limit_amount > 0;
   const ratio = hasLimit ? item.spent / item.limit_amount! : 0;
 
-  const barColor = ratio >= 1 ? '#ef4444' : ratio >= 0.8 ? '#f59e0b' : '#22c55e';
+  const barColor = ratio >= 1 ? C.danger : ratio >= 0.8 ? C.amber : C.accent;
   const barWidth = hasLimit ? `${Math.min(ratio * 100, 100)}%` : '0%';
+  const status = ratio >= 1 ? 'over' : ratio >= 0.8 ? 'near' : 'ok';
 
   return (
-    <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
+    <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.75 }]} onPress={onPress}>
       <View style={styles.row}>
         <Text style={styles.name}>{item.name}</Text>
-        <Text style={[styles.badge, { backgroundColor: barColor }]}>
-          {ratio >= 1 ? 'OVER' : ratio >= 0.8 ? 'NEAR' : 'OK'}
-        </Text>
+        <Text style={[styles.badge, { color: barColor, borderColor: barColor }]}>{status}</Text>
       </View>
 
       {hasLimit ? (
@@ -26,15 +26,19 @@ export default function CategoryCard({ item, onPress }: Props) {
             <View style={[styles.barFill, { width: barWidth as any, backgroundColor: barColor }]} />
           </View>
           <View style={styles.row}>
-            <Text style={styles.sub}>Spent: ₹{item.spent.toFixed(0)}</Text>
-            <Text style={styles.sub}>Limit: ₹{item.limit_amount!.toFixed(0)}</Text>
+            <Text style={styles.sub}>
+              <Text style={styles.mono}>₹{item.spent.toFixed(0)}</Text>
+              <Text style={styles.dimSlash}> / </Text>
+              <Text style={[styles.mono, { color: C.textMuted }]}>₹{item.limit_amount!.toFixed(0)}</Text>
+            </Text>
+            {item.remaining >= 0
+              ? <Text style={[styles.mono, { color: C.textMuted, fontSize: 12 }]}>₹{item.remaining.toFixed(0)} left</Text>
+              : <Text style={[styles.mono, { color: C.danger, fontSize: 12 }]}>+₹{Math.abs(item.remaining).toFixed(0)} over</Text>
+            }
           </View>
-          {item.remaining < 0 && (
-            <Text style={styles.over}>Over by ₹{Math.abs(item.remaining).toFixed(0)}</Text>
-          )}
         </>
       ) : (
-        <Text style={styles.noLimit}>No budget set for this month</Text>
+        <Text style={styles.noLimit}>no budget set</Text>
       )}
     </Pressable>
   );
@@ -42,34 +46,33 @@ export default function CategoryCard({ item, onPress }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
+    backgroundColor: C.surface,
+    borderRadius: 8,
     padding: 16,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: C.border,
   },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  name: { fontSize: 16, fontWeight: '600', textTransform: 'capitalize' },
+  name: { fontSize: 14, fontWeight: '600', color: C.text, fontFamily: FONT.mono, textTransform: 'lowercase' },
   badge: {
     fontSize: 10,
-    fontWeight: '700',
-    color: '#fff',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 20,
+    fontFamily: FONT.mono,
+    borderWidth: 1,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   barBg: {
-    height: 6,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 4,
-    marginVertical: 10,
+    height: 2,
+    backgroundColor: C.surface2,
+    borderRadius: 2,
+    marginVertical: 12,
     overflow: 'hidden',
   },
-  barFill: { height: '100%', borderRadius: 4 },
-  sub: { fontSize: 13, color: '#64748b' },
-  over: { fontSize: 13, color: '#ef4444', marginTop: 4, fontWeight: '600' },
-  noLimit: { fontSize: 13, color: '#94a3b8', marginTop: 8 },
+  barFill: { height: '100%', borderRadius: 2 },
+  sub: { fontSize: 13 },
+  mono: { fontFamily: FONT.mono, color: C.text, fontSize: 13 },
+  dimSlash: { color: C.textMuted },
+  noLimit: { fontSize: 12, color: C.textMuted, marginTop: 8, fontFamily: FONT.mono },
 });

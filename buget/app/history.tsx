@@ -1,17 +1,16 @@
 import React, { useCallback, useState } from 'react';
-import {
-  View, Text, FlatList, Pressable, StyleSheet, Alert,
-} from 'react-native';
+import { View, Text, FlatList, Pressable, StyleSheet } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { getExpensesByMonth, deleteExpense, type Expense } from '../db/queries';
 import { currentMonth } from '../constants/insults';
+import { C, FONT } from '../constants/theme';
 
-function prevMonth(m: string): string {
+function prevMonth(m: string) {
   const [y, mo] = m.split('-').map(Number);
   const d = new Date(y, mo - 2, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 }
-function nextMonth(m: string): string {
+function nextMonth(m: string) {
   const [y, mo] = m.split('-').map(Number);
   const d = new Date(y, mo, 1);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -20,18 +19,16 @@ function nextMonth(m: string): string {
 export default function HistoryScreen() {
   const [month, setMonth] = useState(currentMonth());
   const [expenses, setExpenses] = useState<(Expense & { category_name: string })[]>([]);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
-  const load = useCallback(async () => {
-    setExpenses(await getExpensesByMonth(month));
-  }, [month]);
+  useFocusEffect(useCallback(() => {
+    getExpensesByMonth(month).then(setExpenses);
+  }, [month]));
 
-  useFocusEffect(useCallback(() => { load(); }, [load]));
-
-  const remove = (id: number) => {
-    Alert.alert('Delete expense?', undefined, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: async () => { await deleteExpense(id); load(); } },
-    ]);
+  const confirmDelete = async (id: number) => {
+    await deleteExpense(id);
+    setConfirmDeleteId(null);
+    getExpensesByMonth(month).then(setExpenses);
   };
 
   const total = expenses.reduce((s, e) => s + e.amount, 0);
@@ -40,38 +37,55 @@ export default function HistoryScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.nav}>
-        <Pressable style={styles.navBtn} onPress={() => setMonth(prevMonth(month))}>
-          <Text style={styles.navArrow}>{'<'}</Text>
+        <Pressable onPress={() => setMonth(prevMonth(month))}>
+          <Text style={styles.navArrow}>←</Text>
         </Pressable>
-        <Text style={styles.monthLabel}>{month}</Text>
-        <Pressable style={[styles.navBtn, !canGoNext && styles.navBtnDisabled]} onPress={() => canGoNext && setMonth(nextMonth(month))}>
-          <Text style={[styles.navArrow, !canGoNext && { color: '#cbd5e1' }]}>{'>'}</Text>
+        <Text style={styles.monthLabel}>// {month}</Text>
+        <Pressable onPress={() => canGoNext && setMonth(nextMonth(month))} disabled={!canGoNext}>
+          <Text style={[styles.navArrow, !canGoNext && { color: C.surface2 }]}>→</Text>
         </Pressable>
       </View>
 
       {expenses.length > 0 && (
-        <Text style={styles.total}>Total spent: ₹{total.toFixed(0)}</Text>
+        <Text style={styles.total}>total → ₹{total.toFixed(0)}</Text>
       )}
 
       <FlatList
         data={expenses}
         keyExtractor={i => String(i.id)}
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <View style={styles.rowTop}>
-                <Text style={styles.catName}>{item.category_name}</Text>
-                <Text style={styles.amount}>₹{item.amount.toFixed(0)}</Text>
+        renderItem={({ item }) => {
+          if (confirmDeleteId === item.id) {
+            return (
+              <View style={[styles.row, styles.confirmRow]}>
+                <Text style={styles.confirmText}>delete this?</Text>
+                <View style={styles.actions}>
+                  <Pressable style={styles.dangerBtn} onPress={() => confirmDelete(item.id)}>
+                    <Text style={styles.dangerText}>yes</Text>
+                  </Pressable>
+                  <Pressable style={styles.ghostBtn} onPress={() => setConfirmDeleteId(null)}>
+                    <Text style={styles.ghostText}>no</Text>
+                  </Pressable>
+                </View>
               </View>
-              {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
-              <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
+            );
+          }
+          return (
+            <View style={styles.row}>
+              <View style={{ flex: 1 }}>
+                <View style={styles.rowTop}>
+                  <Text style={styles.catName}>{item.category_name}</Text>
+                  <Text style={styles.amount}>₹{item.amount.toFixed(0)}</Text>
+                </View>
+                {item.note ? <Text style={styles.note}>{item.note}</Text> : null}
+                <Text style={styles.date}>{new Date(item.created_at).toLocaleDateString()}</Text>
+              </View>
+              <Pressable onPress={() => setConfirmDeleteId(item.id)} style={{ paddingLeft: 12 }}>
+                <Text style={styles.deleteBtn}>✕</Text>
+              </Pressable>
             </View>
-            <Pressable onPress={() => remove(item.id)} style={styles.deleteBtn}>
-              <Text style={styles.deleteText}>✕</Text>
-            </Pressable>
-          </View>
-        )}
-        ListEmptyComponent={<Text style={styles.hint}>No expenses for {month}.</Text>}
+          );
+        }}
+        ListEmptyComponent={<Text style={styles.hint}>no expenses for {month}</Text>}
         contentContainerStyle={{ paddingBottom: 24 }}
       />
     </View>
@@ -79,24 +93,28 @@ export default function HistoryScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', padding: 16 },
+  container: { flex: 1, backgroundColor: C.bg, padding: 16 },
   nav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  navBtn: { padding: 8 },
-  navBtnDisabled: { opacity: 0.4 },
-  navArrow: { fontSize: 20, color: '#6366f1', fontWeight: '700' },
-  monthLabel: { fontSize: 16, fontWeight: '700', color: '#1e293b' },
-  total: { fontSize: 14, color: '#64748b', marginBottom: 12, fontWeight: '600' },
+  navArrow: { fontFamily: FONT.mono, fontSize: 18, color: C.accent, padding: 4 },
+  monthLabel: { fontFamily: FONT.mono, fontSize: 13, color: C.text },
+  total: { fontFamily: FONT.mono, fontSize: 12, color: C.textMuted, marginBottom: 14 },
   row: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: '#fff', borderRadius: 10, padding: 14, marginBottom: 8,
-    shadowColor: '#000', shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    backgroundColor: C.surface, borderRadius: 8, padding: 14, marginBottom: 8,
+    borderWidth: 1, borderColor: C.border,
   },
+  confirmRow: { borderColor: C.danger },
   rowTop: { flexDirection: 'row', justifyContent: 'space-between' },
-  catName: { fontSize: 14, fontWeight: '600', textTransform: 'capitalize', color: '#1e293b' },
-  amount: { fontSize: 14, fontWeight: '700', color: '#6366f1' },
-  note: { fontSize: 13, color: '#64748b', marginTop: 2 },
-  date: { fontSize: 11, color: '#94a3b8', marginTop: 4 },
-  deleteBtn: { paddingLeft: 12 },
-  deleteText: { color: '#ef4444', fontSize: 16 },
-  hint: { color: '#94a3b8', fontSize: 14, textAlign: 'center', marginTop: 40 },
+  catName: { fontFamily: FONT.mono, fontSize: 13, color: C.text },
+  amount: { fontFamily: FONT.mono, fontSize: 13, color: C.accent },
+  note: { fontFamily: FONT.mono, fontSize: 12, color: C.textMuted, marginTop: 3 },
+  date: { fontFamily: FONT.mono, fontSize: 10, color: C.textMuted, marginTop: 4 },
+  deleteBtn: { fontFamily: FONT.mono, color: C.danger, fontSize: 14 },
+  confirmText: { fontFamily: FONT.mono, fontSize: 13, color: C.text, flex: 1 },
+  actions: { flexDirection: 'row', gap: 8 },
+  dangerBtn: { borderWidth: 1, borderColor: C.danger, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 6 },
+  dangerText: { fontFamily: FONT.mono, color: C.danger, fontSize: 12 },
+  ghostBtn: { borderWidth: 1, borderColor: C.border2, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 6 },
+  ghostText: { fontFamily: FONT.mono, color: C.textMuted, fontSize: 12 },
+  hint: { fontFamily: FONT.mono, fontSize: 13, color: C.textMuted, textAlign: 'center', marginTop: 40 },
 });

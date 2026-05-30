@@ -2,7 +2,7 @@ import { getDb } from './schema';
 
 export type Category = { id: number; name: string; created_at: string };
 export type Budget = { id: number; category_id: number; month: string; limit_amount: number };
-export type Expense = { id: number; category_id: number; month: string; amount: number; note: string | null; created_at: string };
+export type Expense = { id: number; category_id: number; month: string; amount: number; note: string | null; expense_date: string; created_at: string };
 
 export type CategorySummary = Category & {
   limit_amount: number | null;
@@ -60,14 +60,17 @@ export async function setBudget(categoryId: number, month: string, limitAmount: 
 
 // ── Expenses ──────────────────────────────────────────────────
 
-export async function addExpense(categoryId: number, month: string, amount: number, note: string): Promise<void> {
+// expenseDate: "YYYY-MM-DD" — month is derived from it
+export async function addExpense(categoryId: number, amount: number, note: string, expenseDate: string): Promise<void> {
   const db = await getDb();
+  const month = expenseDate.slice(0, 7); // "YYYY-MM"
   await db.runAsync(
-    'INSERT INTO expenses (category_id, month, amount, note, created_at) VALUES (?, ?, ?, ?, ?)',
+    'INSERT INTO expenses (category_id, month, amount, note, expense_date, created_at) VALUES (?, ?, ?, ?, ?, ?)',
     categoryId,
     month,
     amount,
     note || null,
+    expenseDate,
     new Date().toISOString()
   );
 }
@@ -79,7 +82,7 @@ export async function getExpensesByMonth(month: string): Promise<(Expense & { ca
      FROM expenses e
      JOIN categories c ON c.id = e.category_id
      WHERE e.month = ?
-     ORDER BY e.created_at DESC`,
+     ORDER BY e.expense_date DESC, e.created_at DESC`,
     month
   );
 }
@@ -89,9 +92,13 @@ export async function deleteExpense(id: number): Promise<void> {
   await db.runAsync('DELETE FROM expenses WHERE id = ?', id);
 }
 
-export async function updateExpense(id: number, amount: number, note: string): Promise<void> {
+export async function updateExpense(id: number, amount: number, note: string, expenseDate: string): Promise<void> {
   const db = await getDb();
-  await db.runAsync('UPDATE expenses SET amount = ?, note = ? WHERE id = ?', amount, note || null, id);
+  const month = expenseDate.slice(0, 7);
+  await db.runAsync(
+    'UPDATE expenses SET amount = ?, note = ?, expense_date = ?, month = ? WHERE id = ?',
+    amount, note || null, expenseDate, month, id
+  );
 }
 
 // ── Summary ───────────────────────────────────────────────────
@@ -117,7 +124,7 @@ export async function getMonthlySummary(month: string): Promise<CategorySummary[
 export async function getDailySpend(categoryId: number, month: string): Promise<{ day: number; total: number }[]> {
   const db = await getDb();
   return db.getAllAsync<{ day: number; total: number }>(
-    `SELECT CAST(strftime('%d', created_at) AS INTEGER) as day, SUM(amount) as total
+    `SELECT CAST(strftime('%d', expense_date) AS INTEGER) as day, SUM(amount) as total
      FROM expenses
      WHERE category_id = ? AND month = ?
      GROUP BY day

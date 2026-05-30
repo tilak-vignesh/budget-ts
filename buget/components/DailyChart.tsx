@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { C, FONT } from '../constants/theme';
 
 type Props = {
   data: { day: number; total: number }[];
-  month: string; // "YYYY-MM"
+  month: string;
 };
 
 export default function DailyChart({ data, month }: Props) {
@@ -26,13 +27,13 @@ export default function DailyChart({ data, month }: Props) {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Daily Spending</Text>
-
-      {tooltip && (
-        <Text style={styles.tooltip}>
-          Day {tooltip.day}: ₹{tooltip.total.toFixed(0)}
-        </Text>
-      )}
+      <View style={styles.header}>
+        <Text style={styles.title}>// daily_spend</Text>
+        {tooltip
+          ? <Text style={styles.tooltip}>day {tooltip.day} → ₹{tooltip.total.toFixed(0)}</Text>
+          : <Text style={styles.hint}>tap a bar</Text>
+        }
+      </View>
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chart}>
         {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(day => {
@@ -49,18 +50,14 @@ export default function DailyChart({ data, month }: Props) {
             >
               <View style={styles.barArea}>
                 {total > 0 && (
-                  <View
-                    style={[
-                      styles.bar,
-                      { height: `${heightPct}%` as any },
-                      isActive && styles.barActive,
-                    ]}
-                  />
+                  <View style={[
+                    styles.bar,
+                    { height: `${heightPct}%` as any },
+                    isActive && styles.barActive,
+                  ]} />
                 )}
               </View>
-              <Text style={[styles.dayLabel, isToday && styles.todayLabel]}>
-                {day}
-              </Text>
+              <Text style={[styles.dayLabel, isToday && styles.todayLabel]}>{day}</Text>
             </Pressable>
           );
         })}
@@ -71,48 +68,19 @@ export default function DailyChart({ data, month }: Props) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
+    backgroundColor: C.surface, borderRadius: 8,
+    padding: 16, marginBottom: 16,
+    borderWidth: 1, borderColor: C.border,
   },
-  title: { fontSize: 13, fontWeight: '700', color: '#94a3b8', marginBottom: 8 },
-  tooltip: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#6366f1',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  chart: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    paddingVertical: 4,
-    gap: 4,
-  },
-  barCol: {
-    alignItems: 'center',
-    width: 20,
-  },
-  barArea: {
-    height: 80,
-    justifyContent: 'flex-end',
-    width: '100%',
-  },
-  bar: {
-    width: '100%',
-    backgroundColor: '#6366f1',
-    borderRadius: 3,
-    opacity: 0.8,
-  },
-  barActive: {
-    opacity: 1,
-    backgroundColor: '#4f46e5',
-  },
-  dayLabel: { fontSize: 9, color: '#94a3b8', marginTop: 3 },
-  todayLabel: { color: '#6366f1', fontWeight: '700' },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
+  title: { fontFamily: FONT.mono, fontSize: 11, color: C.textMuted },
+  tooltip: { fontFamily: FONT.mono, fontSize: 12, color: C.accent },
+  hint: { fontFamily: FONT.mono, fontSize: 11, color: C.border2 },
+  chart: { flexDirection: 'row', alignItems: 'flex-end', gap: 3, paddingVertical: 4 },
+  barCol: { alignItems: 'center', width: 18 },
+  barArea: { height: 72, justifyContent: 'flex-end', width: '100%' },
+  bar: { width: '100%', backgroundColor: C.accent, borderRadius: 2, opacity: 0.7 },
+  barActive: { opacity: 1 },
+  dayLabel: { fontFamily: FONT.mono, fontSize: 8, color: C.textMuted, marginTop: 4 },
+  todayLabel: { color: C.accent },
 });

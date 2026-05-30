@@ -35,8 +35,18 @@ export async function initDb() {
       month TEXT NOT NULL,
       amount REAL NOT NULL,
       note TEXT,
+      expense_date TEXT NOT NULL,
       created_at TEXT NOT NULL,
       FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
     );
   `);
+
+  // migration: add expense_date to existing DBs
+  try {
+    await database.execAsync(`ALTER TABLE expenses ADD COLUMN expense_date TEXT;`);
+    // backfill existing rows using created_at
+    await database.execAsync(`UPDATE expenses SET expense_date = substr(created_at, 1, 10) WHERE expense_date IS NULL;`);
+  } catch {
+    // column already exists, skip
+  }
 }

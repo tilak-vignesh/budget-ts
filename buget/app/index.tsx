@@ -3,6 +3,7 @@ import { View, Text, FlatList, StyleSheet, RefreshControl } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { getMonthlySummary, type CategorySummary } from '../db/queries';
 import { currentMonth } from '../constants/insults';
+import { C, FONT } from '../constants/theme';
 import CategoryCard from '../components/CategoryCard';
 
 export default function HomeScreen() {
@@ -12,12 +13,10 @@ export default function HomeScreen() {
   const router = useRouter();
 
   const load = useCallback(async () => {
-    const data = await getMonthlySummary(month);
-    setSummary(data);
+    setSummary(await getMonthlySummary(month));
   }, [month]);
 
   useFocusEffect(useCallback(() => { load(); }, [load]));
-
   const onRefresh = async () => { setRefreshing(true); await load(); setRefreshing(false); };
 
   const over = summary.filter(s => s.limit_amount && s.spent > s.limit_amount);
@@ -25,27 +24,25 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.month}>{month}</Text>
+      <Text style={styles.month}>// {month}</Text>
 
       {over.length > 0 && (
-        <View style={styles.banner}>
-          <Text style={styles.bannerText}>
-            Over budget: {over.map(s => s.name).join(', ')}
-          </Text>
+        <View style={[styles.banner, { borderColor: C.danger }]}>
+          <Text style={[styles.bannerLabel, { color: C.danger }]}>over_budget</Text>
+          <Text style={styles.bannerText}>{over.map(s => s.name).join(', ')}</Text>
         </View>
       )}
       {warning.length > 0 && (
-        <View style={[styles.banner, styles.warnBanner]}>
-          <Text style={styles.bannerText}>
-            Almost full: {warning.map(s => s.name).join(', ')}
-          </Text>
+        <View style={[styles.banner, { borderColor: C.amber }]}>
+          <Text style={[styles.bannerLabel, { color: C.amber }]}>near_limit</Text>
+          <Text style={styles.bannerText}>{warning.map(s => s.name).join(', ')}</Text>
         </View>
       )}
 
       {summary.length === 0 ? (
         <View style={styles.empty}>
-          <Text style={styles.emptyText}>No categories yet.</Text>
-          <Text style={styles.emptyHint}>Go to Categories tab to add some.</Text>
+          <Text style={styles.emptyText}>no categories found</Text>
+          <Text style={styles.emptyHint}>→ go to categories to add some</Text>
         </View>
       ) : (
         <FlatList
@@ -55,7 +52,7 @@ export default function HomeScreen() {
             <CategoryCard item={item} onPress={() => router.push(`/category/${item.id}`)} />
           )}
           contentContainerStyle={{ paddingBottom: 24 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
         />
       )}
     </View>
@@ -63,19 +60,16 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8fafc', padding: 16 },
-  month: { fontSize: 13, color: '#94a3b8', marginBottom: 12, fontWeight: '600' },
+  container: { flex: 1, backgroundColor: C.bg, padding: 16 },
+  month: { fontFamily: FONT.mono, fontSize: 12, color: C.textMuted, marginBottom: 16 },
   banner: {
-    backgroundColor: '#fef2f2',
-    borderLeftWidth: 4,
-    borderLeftColor: '#ef4444',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 8,
+    borderWidth: 1, borderRadius: 6,
+    paddingHorizontal: 12, paddingVertical: 10,
+    marginBottom: 10, gap: 2,
   },
-  warnBanner: { backgroundColor: '#fffbeb', borderLeftColor: '#f59e0b' },
-  bannerText: { fontSize: 13, color: '#334155' },
-  empty: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  emptyText: { fontSize: 18, fontWeight: '600', color: '#334155' },
-  emptyHint: { fontSize: 14, color: '#94a3b8', marginTop: 4 },
+  bannerLabel: { fontFamily: FONT.mono, fontSize: 10, fontWeight: '700' },
+  bannerText: { fontFamily: FONT.mono, fontSize: 12, color: C.textMuted },
+  empty: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: 8 },
+  emptyText: { fontFamily: FONT.mono, fontSize: 16, color: C.text },
+  emptyHint: { fontFamily: FONT.mono, fontSize: 13, color: C.textMuted },
 });
