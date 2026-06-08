@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, ActivityIndicator } from 'react-native';
 import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import { initDb } from '../db/schema';
 import { C } from '../constants/theme';
 
@@ -32,9 +33,30 @@ export default function RootLayout() {
         headerShadowVisible: false,
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'buget', tabBarLabel: 'home' }} />
-      <Tabs.Screen name="categories" options={{ title: 'categories', tabBarLabel: 'categories' }} />
-      <Tabs.Screen name="history" options={{ title: 'history', tabBarLabel: 'history' }} />
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: 'buget',
+          tabBarLabel: 'home',
+          tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="categories"
+        options={{
+          title: 'categories',
+          tabBarLabel: 'categories',
+          tabBarIcon: ({ color, size }) => <Ionicons name="grid-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="history"
+        options={{
+          title: 'history',
+          tabBarLabel: 'history',
+          tabBarIcon: ({ color, size }) => <Ionicons name="time-outline" size={size} color={color} />,
+        }}
+      />
       <Tabs.Screen name="add-expense" options={{ href: null }} />
       <Tabs.Screen name="budget" options={{ href: null }} />
       <Tabs.Screen name="category/[id]" options={{ href: null, title: '' }} />

@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.tilakexpo.buget"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -27,6 +28,13 @@
       "expo-sqlite",
       "expo-status-bar",
       "@react-native-community/datetimepicker"
-    ]
+    ],
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "4e74dc2b-6cc8-4d77-a5de-7ae4eeae558e"
+      }
+    },
+    "owner": "tilakexpo"
   }
 }
