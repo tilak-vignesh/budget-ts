@@ -1,25 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { initDb } from '../db/schema';
 import { C } from '../constants/theme';
 
 export default function RootLayout() {
-  const [ready, setReady] = useState(false);
-
-  useEffect(() => {
-    initDb().then(() => setReady(true));
-  }, []);
-
-  if (!ready) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: C.bg }}>
-        <ActivityIndicator size="large" color={C.accent} />
-      </View>
-    );
-  }
-
   return (
     <Tabs
       screenOptions={{
