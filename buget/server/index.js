@@ -21,12 +21,14 @@ while (process.env[`EMAIL_${i}`]) {
 app.use(express.urlencoded({ extended: false }));
 app.use(express.json());
 
+const isProd = process.env.NODE_ENV === 'production';
+
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: true,   // HTTP only
+    secure: isProd,  // HTTPS only in production; allow HTTP for local dev
     httpOnly: true,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
   },

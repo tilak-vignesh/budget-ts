@@ -19,18 +19,54 @@ function toStr(d: Date) {
 
 export default function DatePicker({ value, onChange }: Props) {
   const [show, setShow] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Web: native <input type="date"> via RNDateTimePicker works directly
+  // Web: use native HTML <input type="date"> — RNDateTimePicker doesn't support web
   if (Platform.OS === 'web') {
+    const handleChange = (e: any) => {
+      const v: string = e.target.value;
+      if (!v) {
+        setError('date is required');
+        return;
+      }
+      const picked = new Date(v);
+      const today = new Date(); today.setHours(23, 59, 59, 999);
+      if (isNaN(picked.getTime())) {
+        setError('invalid date');
+        return;
+      }
+      if (picked > today) {
+        setError('date cannot be in the future');
+        return;
+      }
+      setError(null);
+      onChange(v);
+    };
+
     return (
-      <View style={styles.webWrapper}>
-        <RNDateTimePicker
-          value={toDate(value)}
-          mode="date"
-          maximumDate={new Date()}
-          onChange={(_, d) => d && onChange(toStr(d))}
-          style={{ backgroundColor: 'transparent' }}
-        />
+      <View>
+        <View style={[styles.webWrapper, error ? styles.webWrapperError : null]}>
+          {/* @ts-ignore – web-only element */}
+          <input
+            type="date"
+            value={value}
+            max={toStr(new Date())}
+            onChange={handleChange}
+            style={{
+              width: '100%',
+              padding: '12px',
+              background: 'transparent',
+              border: 'none',
+              color: '#eaeaea',
+              fontFamily: 'monospace',
+              fontSize: '14px',
+              cursor: 'pointer',
+              outline: 'none',
+              colorScheme: 'dark',
+            }}
+          />
+        </View>
+        {error && <Text style={styles.errorText}>{error}</Text>}
       </View>
     );
   }
@@ -71,6 +107,8 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border,
     borderRadius: 6, overflow: 'hidden',
   },
+  webWrapperError: { borderColor: C.danger },
+  errorText: { fontFamily: FONT.mono, fontSize: 11, color: C.danger, marginTop: 4 },
   field: {
     backgroundColor: C.surface2, borderWidth: 1, borderColor: C.border,
     borderRadius: 6, padding: 12, flexDirection: 'row', justifyContent: 'space-between',

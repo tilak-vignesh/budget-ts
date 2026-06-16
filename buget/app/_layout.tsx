@@ -1,9 +1,21 @@
-import React from 'react';
+import { useEffect } from 'react';
+import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '../constants/theme';
 
 export default function RootLayout() {
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    // Fix mobile browser viewport clipping: `100%` height is based on the
+    // initial viewport including browser chrome, so content gets cut off.
+    // `100dvh` (dynamic viewport height) updates as chrome shows/hides.
+    const style = document.createElement('style');
+    style.textContent = '#root { min-height: 100dvh; }';
+    document.head.appendChild(style);
+    return () => { document.head.removeChild(style); };
+  }, []);
+
   return (
     <Tabs
       screenOptions={{
