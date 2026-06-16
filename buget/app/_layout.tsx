@@ -1,8 +1,21 @@
 import { useEffect } from 'react';
-import { Platform } from 'react-native';
+import { Platform, Pressable, Text } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { C } from '../constants/theme';
+
+function LogoutButton() {
+  const handleLogout = async () => {
+    await fetch('/logout', { method: 'POST', credentials: 'same-origin' });
+    window.location.href = '/login';
+  };
+  if (Platform.OS !== 'web') return null;
+  return (
+    <Pressable onPress={handleLogout} style={{ paddingHorizontal: 14 }}>
+      <Text style={{ fontFamily: 'monospace', fontSize: 12, color: C.textMuted }}>logout</Text>
+    </Pressable>
+  );
+}
 
 export default function RootLayout() {
   useEffect(() => {
@@ -35,6 +48,7 @@ export default function RootLayout() {
           title: 'buget',
           tabBarLabel: 'home',
           tabBarIcon: ({ color, size }) => <Ionicons name="home-outline" size={size} color={color} />,
+          headerRight: () => <LogoutButton />,
         }}
       />
       <Tabs.Screen

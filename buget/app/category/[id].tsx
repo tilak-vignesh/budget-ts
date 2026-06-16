@@ -58,16 +58,20 @@ export default function CategoryDetail() {
   const submitAdd = async () => {
     const num = parseFloat(amount);
     if (!(num > 0)) return Alert.alert('enter a valid amount');
-    await addExpense(catId, num, note, expenseDate);
-    const expMonth = expenseDate.slice(0, 7);
-    const newSpent = await getSpentForCategory(catId, expMonth);
-    const budget = await getBudget(catId, expMonth);
-    setAmount('');
-    setNote('');
-    setExpenseDate(todayStr());
-    await load();
-    if (budget && newSpent > budget.limit_amount) setInsult(randomInsult());
-    else if (budget && newSpent >= budget.limit_amount) Alert.alert('limit reached', "you've hit your limit.");
+    try {
+      await addExpense(catId, num, note, expenseDate);
+      const expMonth = expenseDate.slice(0, 7);
+      const newSpent = await getSpentForCategory(catId, expMonth);
+      const budget = await getBudget(catId, expMonth);
+      setAmount('');
+      setNote('');
+      setExpenseDate(todayStr());
+      await load();
+      if (budget && newSpent > budget.limit_amount) setInsult(randomInsult());
+      else if (budget && newSpent >= budget.limit_amount) Alert.alert('limit reached', "you've hit your limit.");
+    } catch (e: any) {
+      Alert.alert('error', e?.message ?? 'failed to add expense');
+    }
   };
 
   const submitEdit = async () => {

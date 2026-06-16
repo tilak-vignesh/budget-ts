@@ -54,6 +54,7 @@ export default function DatePicker({ value, onChange }: Props) {
             onChange={handleChange}
             style={{
               width: '100%',
+              boxSizing: 'border-box',
               padding: '12px',
               background: 'transparent',
               border: 'none',
